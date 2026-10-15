@@ -8,7 +8,7 @@ const baseline = read("baseline.json");
 const repos = read("repos.json");
 const repo = "BSStudio/request-manager";
 
-// request-manager before the rollout, trimmed to a few fields more than the baseline names.
+// request-manager's responses, trimmed to a few fields more than the baseline names.
 const responses = {
   repository: {
     full_name: "BSStudio/request-manager",
@@ -63,11 +63,13 @@ test("leaves the baseline and the override untouched", () => {
   assert.deepEqual(override, { repository: { has_issues: false } });
 });
 
-test("every override in repos.json names a baseline setting", () => {
+test("every override in repos.json names a baseline setting of the same kind", () => {
+  const isGroup = (value) => typeof value === "object" && value !== null;
   for (const [name, override] of Object.entries(repos)) {
     for (const [group, value] of Object.entries(override)) {
       assert.ok(Object.hasOwn(baseline, group), `${name}: ${group}`);
-      if (typeof value !== "object" || value === null) continue;
+      assert.equal(isGroup(value), isGroup(baseline[group]), `${name}: ${group} must be ${isGroup(baseline[group]) ? "an object" : "a value"}`);
+      if (!isGroup(value)) continue;
       for (const key of Object.keys(value)) assert.ok(Object.hasOwn(baseline[group], key), `${name}: ${group}.${key}`);
     }
   }
