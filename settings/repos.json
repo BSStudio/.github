@@ -1,0 +1,9 @@
+{
+  "BSStudio/request-manager": {},
+  "BSStudio/backstage": {},
+  "BSStudio/helm-charts": {},
+  "BSStudio/mattermost-image": {},
+  "BSStudio/mattermost-oidc": { "repository": { "allow_auto_merge": false, "has_issues": false } },
+  "BSStudio/renovate-config": {},
+  "BSStudio/.github": {}
+}
