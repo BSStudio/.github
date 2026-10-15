@@ -1,0 +1,21 @@
+{
+  "repository": {
+    "allow_squash_merge": true,
+    "allow_merge_commit": false,
+    "allow_rebase_merge": false,
+    "squash_merge_commit_title": "PR_TITLE",
+    "squash_merge_commit_message": "BLANK",
+    "delete_branch_on_merge": true,
+    "allow_update_branch": false,
+    "allow_auto_merge": true,
+    "has_issues": true,
+    "has_wiki": false,
+    "has_projects": false
+  },
+  "workflow": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+  "dependabotSecurityUpdates": false,
+  "securityConfiguration": "GitHub recommended"
+}
