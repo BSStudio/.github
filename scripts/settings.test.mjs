@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { readJson } from "./io.mjs";
 import { currentSettings, desiredSettings, diffSettings, formatEntry, selectRepos, writes } from "./settings.mjs";
 
-const read = (file) => JSON.parse(readFileSync(new URL(`../settings/${file}`, import.meta.url), "utf8"));
-const baseline = read("baseline.json");
-const repos = read("repos.json");
+const baseline = readJson("settings/baseline.json");
+const repos = readJson("settings/repos.json");
 const repo = "BSStudio/request-manager";
 
 // request-manager's responses, trimmed to a few fields more than the baseline names.
@@ -63,14 +62,21 @@ test("leaves the baseline and the override untouched", () => {
   assert.deepEqual(override, { repository: { has_issues: false } });
 });
 
-test("every override in repos.json names a baseline setting of the same kind", () => {
+test("every override in repos.json names a baseline setting and keeps its type", () => {
   const isGroup = (value) => typeof value === "object" && value !== null;
   for (const [name, override] of Object.entries(repos)) {
     for (const [group, value] of Object.entries(override)) {
       assert.ok(Object.hasOwn(baseline, group), `${name}: ${group}`);
       assert.equal(isGroup(value), isGroup(baseline[group]), `${name}: ${group} must be ${isGroup(baseline[group]) ? "an object" : "a value"}`);
-      if (!isGroup(value)) continue;
-      for (const key of Object.keys(value)) assert.ok(Object.hasOwn(baseline[group], key), `${name}: ${group}.${key}`);
+      if (!isGroup(value)) {
+        // null switches the check off, anything else must be of the baseline's type.
+        if (value !== null) assert.equal(typeof value, typeof baseline[group], `${name}: ${group}`);
+        continue;
+      }
+      for (const [key, setting] of Object.entries(value)) {
+        assert.ok(Object.hasOwn(baseline[group], key), `${name}: ${group}.${key}`);
+        assert.equal(typeof setting, typeof baseline[group][key], `${name}: ${group}.${key}`);
+      }
     }
   }
 });
@@ -98,7 +104,7 @@ test("no configuration at all counts as none", () => {
 });
 
 test("lists each setting that differs", () => {
-  const diff = diffSettings(currentSettings(responses), desiredSettings(baseline, repos[repo]));
+  const diff = diffSettings(currentSettings(responses), desiredSettings(baseline, {}));
   assert.deepEqual(diff, [
     { group: "repository", key: "allow_update_branch", from: true, to: false },
     { group: "repository", key: "has_projects", from: true, to: false },
@@ -109,26 +115,26 @@ test("lists each setting that differs", () => {
 });
 
 test("an up-to-date repo has no differences, whatever else the API returns", () => {
-  const desired = desiredSettings(baseline, repos[repo]);
+  const desired = desiredSettings(baseline, {});
   const current = structuredClone(desired);
   current.repository.full_name = repo;
   assert.deepEqual(diffSettings(current, desired), []);
 });
 
 test("a setting the API did not return counts as different", () => {
-  const desired = desiredSettings(baseline, repos[repo]);
+  const desired = desiredSettings(baseline, {});
   const current = structuredClone(desired);
   delete current.repository.allow_update_branch;
   assert.deepEqual(diffSettings(current, desired), [{ group: "repository", key: "allow_update_branch", from: undefined, to: false }]);
 });
 
 test("a null in the desired state skips that check", () => {
-  const desired = desiredSettings(baseline, { ...repos[repo], securityConfiguration: null });
+  const desired = desiredSettings(baseline, { securityConfiguration: null });
   assert.equal(diffSettings(currentSettings(responses), desired).some((entry) => entry.group === "securityConfiguration"), false);
 });
 
 test("patches only the repository settings that differ", () => {
-  const desired = desiredSettings(baseline, repos[repo]);
+  const desired = desiredSettings(baseline, {});
   const calls = writes(repo, diffSettings(currentSettings(responses), desired), desired);
   assert.deepEqual(calls[0], { method: "PATCH", path: `repos/${repo}`, body: { allow_update_branch: false, has_projects: false } });
 });
