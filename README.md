@@ -25,6 +25,6 @@ node scripts/apply-settings.mjs                               # fix them in ever
 node scripts/apply-settings.mjs --dry-run BSStudio/backstage  # one repo
 ```
 
-A named repo must be listed in `settings/repos.json`. A run writes only what differs, then reads the repo again and reports anything GitHub did not take.
+A named repo must be listed in `settings/repos.json`. A run writes only what differs, then reads the repo again and reports anything GitHub did not take. Run it as an admin of the listed repos: without admin rights GitHub leaves some settings out of its answers (they show as `missing`) and refuses the writes. A failed call is reported with the `gh` command that failed.
 
 Security features (secret scanning, push protection, Dependabot alerts, CodeQL default setup, private vulnerability reporting) come from the organisation's "GitHub recommended" code security configuration, which is the default for new public repos. The script checks that it is attached and never attaches it.

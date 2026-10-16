@@ -1,13 +1,11 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { gh, readJson } from "./io.mjs";
 import { currentSettings, desiredSettings, diffSettings, formatEntry, selectRepos, writes } from "./settings.mjs";
 
 const usage = "usage: node scripts/apply-settings.mjs [--dry-run] [owner/repo]...";
 const args = process.argv.slice(2);
 const dryRun = args[0] === "--dry-run";
-const read = (file) => JSON.parse(readFileSync(new URL(`../settings/${file}`, import.meta.url), "utf8"));
-const baseline = read("baseline.json");
-const repos = read("repos.json");
+const baseline = readJson("settings/baseline.json");
+const repos = readJson("settings/repos.json");
 
 let selected;
 try {
@@ -17,46 +15,45 @@ try {
   process.exit(2);
 }
 
-const gh = (ghArgs, input) => execFileSync("gh", ghArgs, { input, encoding: "utf8", stdio: "pipe" });
 // A repo without a security configuration answers 204 with no body.
-const get = (path) => {
-  const text = gh(["api", path]);
+const get = async (path) => {
+  const text = await gh(["api", path]);
   return text.trim() === "" ? null : JSON.parse(text);
 };
-const readCurrent = (repo) =>
-  currentSettings({
-    repository: get(`repos/${repo}`),
-    workflow: get(`repos/${repo}/actions/permissions/workflow`),
-    securityFixes: get(`repos/${repo}/automated-security-fixes`),
-    configuration: get(`repos/${repo}/code-security-configuration`),
-  });
+const readCurrent = async (repo) => {
+  const [repository, workflow, securityFixes, configuration] = await Promise.all([
+    get(`repos/${repo}`),
+    get(`repos/${repo}/actions/permissions/workflow`),
+    get(`repos/${repo}/automated-security-fixes`),
+    get(`repos/${repo}/code-security-configuration`),
+  ]);
+  return currentSettings({ repository, workflow, securityFixes, configuration });
+};
 
-let failed = false;
-for (const repo of selected) {
+async function apply(repo) {
+  const lines = [];
   try {
     const desired = desiredSettings(baseline, repos[repo]);
-    const diff = diffSettings(readCurrent(repo), desired);
-    if (diff.length === 0) {
-      console.log(`${repo}: up to date`);
-      continue;
-    }
-    for (const entry of diff) console.log(`${repo} ${formatEntry(entry)}`);
-    if (dryRun) {
-      failed = true;
-      continue;
-    }
+    const diff = diffSettings(await readCurrent(repo), desired);
+    if (diff.length === 0) return { lines: [`${repo}: up to date`], failed: false };
+    lines.push(...diff.map((entry) => `${repo} ${formatEntry(entry)}`));
+    if (dryRun) return { lines, failed: true };
     for (const call of writes(repo, diff, desired)) {
       const body = call.body && JSON.stringify(call.body);
-      gh(["api", "-X", call.method, call.path, ...(body ? ["--input", "-"] : [])], body);
+      await gh(["api", "-X", call.method, call.path, ...(body ? ["--input", "-"] : [])], body);
     }
     // Read back: GitHub can accept a field and not apply it.
-    const remaining = diffSettings(readCurrent(repo), desired);
-    if (remaining.length === 0) console.log(`${repo}: applied`);
-    for (const entry of remaining) console.log(`${repo} still differs, ${formatEntry(entry)}`);
-    if (remaining.length > 0) failed = true;
+    const remaining = diffSettings(await readCurrent(repo), desired);
+    if (remaining.length === 0) lines.push(`${repo}: applied`);
+    lines.push(...remaining.map((entry) => `${repo} still differs, ${formatEntry(entry)}`));
+    return { lines, failed: remaining.length > 0 };
   } catch (error) {
-    console.log(`${repo}: failed: ${error.stderr?.trim() || error.message}`);
-    failed = true;
+    lines.push(`${repo}: failed: ${error.message}`);
+    return { lines, failed: true };
   }
 }
-process.exitCode = failed ? 1 : 0;
+
+// Repos run in parallel; their lines print in the order the repos were selected.
+const results = await Promise.all(selected.map(apply));
+for (const { lines } of results) for (const line of lines) console.log(line);
+process.exitCode = results.some((result) => result.failed) ? 1 : 0;

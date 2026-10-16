@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { readJson } from "./io.mjs";
 import { buildRuleset, findRulesetId } from "./ruleset.mjs";
 
-const base = JSON.parse(readFileSync(new URL("../rulesets/main.json", import.meta.url), "utf8"));
+const base = readJson("rulesets/main.json");
 const rule = (ruleset, type) => ruleset.rules.find((r) => r.type === type);
 
 test("fills in the required checks", () => {
