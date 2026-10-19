@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/BSStudio/.github/main/assets/bss-logo.png" width="40%" alt="Budavári Schönherz Stúdió logo">
+</p>
+
+---
+
 # .github
 
 Organisation-wide defaults for Budavári Schönherz Stúdió repositories.
