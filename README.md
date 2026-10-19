@@ -31,6 +31,8 @@ node scripts/apply-settings.mjs                               # fix them in ever
 node scripts/apply-settings.mjs --dry-run BSStudio/backstage  # one repo
 ```
 
+Settings must not drift unnoticed: `.github/workflows/settings-drift.yml` runs the dry run every Monday morning and fails when anything differs. It reads the repos with a token from the read-only "BSStudio settings check" GitHub App (Administration: read), which is installed on the repos in `settings/repos.json`; a repo added to that file needs the App installed too. Fixing drift stays a local run of the script. GitHub turns scheduled workflows off after 60 days without activity in the repo and emails about it; Renovate's monthly PRs normally keep it active.
+
 A named repo must be listed in `settings/repos.json`. A run writes only what differs, then reads the repo again and reports anything GitHub did not take. Run it as an admin of the listed repos: without admin rights GitHub leaves some settings out of its answers (they show as `missing`) and refuses the writes. A failed call is reported with the `gh` command that failed.
 
 Security features (secret scanning, push protection, Dependabot alerts, CodeQL default setup, private vulnerability reporting) come from the organisation's "GitHub recommended" code security configuration, which is the default for new public repos. The script checks that it is attached and never attaches it.
