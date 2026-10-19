@@ -1,0 +1,47 @@
+name: Shared checks
+
+on:
+  workflow_call:
+    inputs:
+      dependency-review:
+        description: Review dependency changes for licences and known vulnerabilities. Public repositories only.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  workflows:
+    name: Workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check workflows
+        uses: $/.github/actions/workflow-checks
+        with:
+          github-token: ${{ github.token }}
+
+  dependencies:
+    name: Dependencies
+    if: inputs.dependency-review && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # Every dependency's licence may be combined with GPL-3.0 code that is distributed (public Docker images).
+          # Missing on purpose, so they fail and need a decision: AGPL-3.0, proprietary and source-available
+          # licences, non-commercial ones, and GPL-incompatible copyleft (EPL, CDDL, GPL-2.0-only).
+          allow-licenses: >-
+            MIT, MIT-0, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Zlib, BSL-1.0, Unlicense, CC0-1.0,
+            WTFPL, BlueOak-1.0.0, Python-2.0, PSF-2.0, Artistic-2.0, Unicode-3.0, Unicode-DFS-2016,
+            MPL-2.0, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later,
+            GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later,
+            CC-BY-3.0, CC-BY-4.0, OFL-1.1

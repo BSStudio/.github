@@ -3,5 +3,15 @@
   "extends": [
     "github>BSStudio/renovate-config",
     "github>BSStudio/renovate-config:monthly"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Container images that composite actions run with docker run stay pinned by tag and digest; this keeps both current.",
+      "managerFilePatterns": ["/^\\.github/actions/.+/action\\.yml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+\\w+: \\S+?:(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ]
+    }
   ]
 }

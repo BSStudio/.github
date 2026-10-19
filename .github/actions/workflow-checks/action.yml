@@ -1,0 +1,40 @@
+name: Workflow checks
+
+description: Runs actionlint, zizmor and the workflow convention checker over the repository's workflows and composite actions.
+
+inputs:
+  files:
+    description: Files for the convention checker, as shell patterns; patterns that match nothing are skipped.
+    default: .github/workflows/*.yml .github/workflows/*.yaml .github/actions/*/action.yml .github/actions/*/action.yaml
+
+  github-token:
+    description: Token for zizmor's online audits; read access to the repository is enough.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Run actionlint
+      shell: bash
+      env:
+        # renovate: datasource=docker depName=rhysd/actionlint
+        ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+      run: docker run --rm --volume "$GITHUB_WORKSPACE:/repo:ro" --workdir /repo "$ACTIONLINT_IMAGE" -color
+
+    - name: Run zizmor
+      if: "!cancelled()"
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        # renovate: datasource=docker depName=ghcr.io/zizmorcore/zizmor
+        ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.31.1@sha256:42d409dbb851d4c5d35a058cf042b828bea1e3f2884378c526eb0974780e18d9
+      run: docker run --rm --env GH_TOKEN --volume "$GITHUB_WORKSPACE:/repo:ro" --volume "$GITHUB_ACTION_PATH:/config:ro" --workdir /repo "$ZIZMOR_IMAGE" --config /config/zizmor.yml --format github .
+
+    - name: Check the workflow convention
+      if: "!cancelled()"
+      shell: bash
+      env:
+        FILES: ${{ inputs.files }}
+      run: |
+        shopt -s nullglob
+        node "$GITHUB_ACTION_PATH/../../../scripts/check-workflows.mjs" $FILES
