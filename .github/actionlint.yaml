@@ -1,0 +1,5 @@
+paths:
+  .github/workflows/shared-checks.yml:
+    ignore:
+      # Callers in other repositories must reach this repository's action at the commit they pinned, which only the $/ self-repository syntax does; actionlint predates it.
+      - specifying action "\$/

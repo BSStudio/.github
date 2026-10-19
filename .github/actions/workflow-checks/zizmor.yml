@@ -1,0 +1,9 @@
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": hash-pin
+
+  # Local actions stay on ./ until actionlint understands the $/ self-repository syntax.
+  self-repository:
+    disable: true

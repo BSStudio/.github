@@ -3,7 +3,7 @@
 // maps, flow lists of at most one item), so an indentation-based reader is enough; anything
 // outside that subset is reported rather than parsed.
 
-const KEY = /^([A-Za-z_][\w.-]*):(?:\s+(.*))?$/;
+const KEY = /^(?:"([^"]+)"|([A-Za-z_][\w.-]*)):(?:\s+(.*))?$/;
 const BLOCK_SCALAR = /^[|>][+-]?\d*\s*(#.*)?$/;
 const TOP_LEVEL_ORDER = ["name", "run-name", "on", "permissions", "concurrency", "defaults", "env", "jobs"];
 
@@ -48,14 +48,15 @@ function parse(text) {
       kinds.push("comment");
       continue;
     }
-    kinds.push(trimmed === "---" ? "document" : "content");
-    if (trimmed === "---") continue;
+    const isDocument = /^---(\s+#.*)?$/.test(trimmed);
+    kinds.push(isDocument ? "document" : "content");
+    if (isDocument) continue;
 
     const isItem = trimmed === "-" || trimmed.startsWith("- ");
     while (stack.length > 1) {
       const top = stack.at(-1);
       // A sequence written at its parent key's indent still belongs to that key.
-      const ownsItem = isItem && !top.isItem && top.indent === indent && top.value === "" && top.children.length === 0;
+      const ownsItem = isItem && !top.isItem && top.indent === indent && top.value === "" && top.children.every((entry) => entry.isItem);
       if (top.indent < indent || ownsItem) break;
       stack.pop();
     }
@@ -90,9 +91,9 @@ function parse(text) {
 }
 
 function keyNode(line, indent, match) {
-  const raw = match[2] ?? "";
+  const raw = match[3] ?? "";
   const block = BLOCK_SCALAR.test(raw);
-  return { line, indent, key: match[1], raw, value: block ? "" : withoutComment(raw).trim(), block, isItem: false, children: [], scalar: [] };
+  return { line, indent, key: match[1] ?? match[2], raw, value: block ? "" : withoutComment(raw).trim(), block, isItem: false, children: [], scalar: [] };
 }
 
 function setEndLines(node) {
@@ -206,7 +207,7 @@ function checkWorkflowRules(root, kinds, report) {
   }
 
   const jobs = keys(child(root, "jobs"));
-  const hasRun = jobs.some((job) => [...walk(job)].some((node) => node.key === "run"));
+  const hasRun = jobs.some((job) => (child(job, "steps")?.children ?? []).some((step) => child(step, "run")));
   if (hasRun && child(child(child(root, "defaults"), "run"), "shell")?.value !== "bash") report(1, "missing defaults.run.shell: bash");
 
   jobs.forEach((job, index) => {
@@ -220,7 +221,7 @@ function checkWorkflowRules(root, kinds, report) {
 export function checkWorkflow(text, path) {
   const findings = [];
   const report = (line, message) => findings.push({ path, line, message });
-  const action = /(^|\/)action\.ya?ml$/.test(path);
+  const action = /(^|[\\/])action\.ya?ml$/.test(path);
 
   if (path.endsWith(".yaml")) report(1, "use the .yml extension");
   const { root, kinds } = parse(text);

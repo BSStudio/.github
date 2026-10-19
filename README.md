@@ -34,3 +34,9 @@ node scripts/apply-settings.mjs --dry-run BSStudio/backstage  # one repo
 A named repo must be listed in `settings/repos.json`. A run writes only what differs, then reads the repo again and reports anything GitHub did not take. Run it as an admin of the listed repos: without admin rights GitHub leaves some settings out of its answers (they show as `missing`) and refuses the writes. A failed call is reported with the `gh` command that failed.
 
 Security features (secret scanning, push protection, Dependabot alerts, CodeQL default setup, private vulnerability reporting) come from the organisation's "GitHub recommended" code security configuration, which is the default for new public repos. The script checks that it is attached and never attaches it.
+
+## Workflows
+
+Every workflow follows one convention, written down in [`docs/workflows.md`](docs/workflows.md). Each repo enforces it with a `.github/workflows/checks.yml` that calls `.github/workflows/shared-checks.yml` here (the copyable caller is in the convention): `Checks / Workflows` runs actionlint, zizmor and `scripts/check-workflows.mjs` over the repo's workflows and composite actions, and `Checks / Dependencies` reviews new dependencies for vulnerabilities and licences in repos that turn it on. Wherever a ruleset exists it requires `Checks / Workflows`, plus `Checks / Dependencies` where the review is on.
+
+Callers pin a tagged release of this repo; Renovate proposes each new release. The checks run from the same commit as the workflow that calls them: `shared-checks.yml` reaches its composite action through the `$/` self-repository syntax.

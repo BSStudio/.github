@@ -244,6 +244,30 @@ test("unsupported constructs", () => {
   assert.deepEqual(check(flowList), [{ line: 6, message: "flow lists hold at most one item" }]);
 });
 
+test("Windows paths still select composite-action mode", () => {
+  const action = doc("name: Setup", "", "runs:", "  using: composite", "  steps:", "    - name: Install", "      shell: bash", "      run: pnpm install");
+  assert.deepEqual(check(action, ".github\\actions\\setup\\action.yml"), []);
+});
+
+test("unindented sequences keep every item", () => {
+  const text = doc(header, job.slice(0, 4), "    steps:", "    - name: A", "      run: echo a", "", "    - run: echo b");
+  assert.deepEqual(check(text), [{ line: 26, message: "step has no name" }]);
+});
+
+test("a double-quoted on key is still the on key", () => {
+  const text = doc(header.slice(0, 2), '"on":', header.slice(3), job, step);
+  assert.deepEqual(check(text), []);
+});
+
+test("a document marker with a comment is still a document marker", () => {
+  assert.deepEqual(check(doc("--- # yaml-language-server: $schema=x", header, job, step)), [{ line: 1, message: "document start marker" }]);
+});
+
+test("job-level defaults.run is not a run step", () => {
+  const text = doc(header.slice(0, 12), header.slice(16), "  test:", "    name: Test", "    runs-on: ubuntu-latest", "    timeout-minutes: 10", "    defaults:", "      run:", "        working-directory: backend", "    steps:", "      - name: Check out", "        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1");
+  assert.deepEqual(check(text), []);
+});
+
 test("CRLF input gives the same findings as LF", () => {
   const lf = doc(header, job, "      - run: echo a", "      - name: B", "        shell: bash", "        run: echo ${{ github.ref }}");
   const crlf = lf.replaceAll("\n", "\r\n");
