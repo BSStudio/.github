@@ -1,5 +1,5 @@
 import { gh, readJson } from "./io.mjs";
-import { currentSettings, desiredSettings, diffSettings, formatEntry, selectRepos, writes } from "./settings.mjs";
+import { currentSettings, desiredSettings, diffSettings, formatEntry, MERGE_QUERY, selectRepos, writes } from "./settings.mjs";
 
 const usage = "usage: node scripts/apply-settings.mjs [--dry-run] [owner/repo]...";
 const args = process.argv.slice(2);
@@ -20,14 +20,22 @@ const get = async (path) => {
   const text = await gh(["api", path]);
   return text.trim() === "" ? null : JSON.parse(text);
 };
+const getMerge = async (repo) => {
+  const [owner, name] = repo.split("/");
+  const text = await gh(["api", "graphql", "-f", `query=${MERGE_QUERY}`, "-f", `owner=${owner}`, "-f", `name=${name}`]);
+  const body = JSON.parse(text);
+  if (!body.data?.repository) throw new Error(`graphql ${repo}: ${body.errors?.map((error) => error.message).join("; ") ?? "no repository in the answer"}`);
+  return body.data.repository;
+};
 const readCurrent = async (repo) => {
-  const [repository, workflow, securityFixes, configuration] = await Promise.all([
+  const [repository, merge, workflow, securityFixes, configuration] = await Promise.all([
     get(`repos/${repo}`),
+    getMerge(repo),
     get(`repos/${repo}/actions/permissions/workflow`),
     get(`repos/${repo}/automated-security-fixes`),
     get(`repos/${repo}/code-security-configuration`),
   ]);
-  return currentSettings({ repository, workflow, securityFixes, configuration });
+  return currentSettings({ repository, merge, workflow, securityFixes, configuration });
 };
 
 async function apply(repo) {

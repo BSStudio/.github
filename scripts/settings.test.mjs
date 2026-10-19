@@ -7,21 +7,23 @@ const baseline = readJson("settings/baseline.json");
 const repos = readJson("settings/repos.json");
 const repo = "BSStudio/request-manager";
 
-// request-manager's responses, trimmed to a few fields more than the baseline names.
+// request-manager's responses as a read-only token sees them: REST leaves out the merge settings, GraphQL has them.
 const responses = {
   repository: {
     full_name: "BSStudio/request-manager",
-    allow_squash_merge: true,
-    allow_merge_commit: false,
-    allow_rebase_merge: false,
-    squash_merge_commit_title: "PR_TITLE",
-    squash_merge_commit_message: "BLANK",
-    delete_branch_on_merge: true,
-    allow_update_branch: true,
-    allow_auto_merge: true,
     has_issues: true,
     has_wiki: false,
     has_projects: true,
+  },
+  merge: {
+    squashMergeAllowed: true,
+    mergeCommitAllowed: false,
+    rebaseMergeAllowed: false,
+    autoMergeAllowed: true,
+    deleteBranchOnMerge: true,
+    squashMergeCommitTitle: "PR_TITLE",
+    squashMergeCommitMessage: "BLANK",
+    allowUpdateBranch: true,
   },
   workflow: { default_workflow_permissions: "write", can_approve_pull_request_reviews: true },
   securityFixes: { enabled: false, paused: false },
@@ -86,6 +88,30 @@ test("reads the API responses in the baseline's shape", () => {
   assert.equal(current.repository.allow_update_branch, true);
   assert.deepEqual(current.workflow, responses.workflow);
   assert.equal(current.dependabotSecurityUpdates, false);
+});
+
+test("merge settings come from GraphQL", () => {
+  const { repository } = currentSettings(responses);
+  assert.equal(repository.allow_squash_merge, true);
+  assert.equal(repository.allow_merge_commit, false);
+  assert.equal(repository.allow_rebase_merge, false);
+  assert.equal(repository.allow_auto_merge, true);
+  assert.equal(repository.delete_branch_on_merge, true);
+  assert.equal(repository.squash_merge_commit_title, "PR_TITLE");
+  assert.equal(repository.squash_merge_commit_message, "BLANK");
+  assert.equal(repository.allow_update_branch, true);
+  assert.equal(repository.has_wiki, false);
+});
+
+test("GraphQL wins over REST for merge settings", () => {
+  const rest = { ...responses.repository, allow_auto_merge: false };
+  assert.equal(currentSettings({ ...responses, repository: rest }).repository.allow_auto_merge, true);
+});
+
+test("without a GraphQL answer the merge settings are missing", () => {
+  const { repository } = currentSettings({ ...responses, merge: null });
+  assert.equal(repository.allow_squash_merge, undefined);
+  assert.equal(repository.has_wiki, false);
 });
 
 test("a removed configuration counts as none", () => {

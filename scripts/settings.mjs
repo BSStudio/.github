@@ -18,10 +18,26 @@ export function desiredSettings(baseline, override) {
 }
 
 // A "removed" or "detached" status still names the configuration the repo had.
-export function currentSettings({ repository, workflow, securityFixes, configuration }) {
+// GraphQL names of the merge settings, keyed by their REST names.
+const MERGE_FIELDS = {
+  allow_squash_merge: "squashMergeAllowed",
+  allow_merge_commit: "mergeCommitAllowed",
+  allow_rebase_merge: "rebaseMergeAllowed",
+  allow_auto_merge: "autoMergeAllowed",
+  delete_branch_on_merge: "deleteBranchOnMerge",
+  squash_merge_commit_title: "squashMergeCommitTitle",
+  squash_merge_commit_message: "squashMergeCommitMessage",
+  allow_update_branch: "allowUpdateBranch",
+};
+
+export const MERGE_QUERY = `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { ${Object.values(MERGE_FIELDS).join(" ")} } }`;
+
+// Merge settings come from GraphQL: the REST repository leaves them out for tokens without contents write, such as the read-only drift check's.
+export function currentSettings({ repository, merge, workflow, securityFixes, configuration }) {
   const applies = configuration !== null && ["attached", "enforced"].includes(configuration.status);
+  const mergeSettings = merge ? Object.fromEntries(Object.entries(MERGE_FIELDS).map(([rest, graphql]) => [rest, merge[graphql]])) : {};
   return {
-    repository,
+    repository: { ...repository, ...mergeSettings },
     workflow,
     dependabotSecurityUpdates: securityFixes.enabled,
     securityConfiguration: applies ? configuration.configuration.name : null,
