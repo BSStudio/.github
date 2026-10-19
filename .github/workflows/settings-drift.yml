@@ -1,0 +1,48 @@
+name: Settings drift
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  drift:
+    name: Settings drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: List the repositories to check
+        id: repos
+        run: echo "names=$(node -p "Object.keys(require('./settings/repos.json')).map((name) => name.split('/')[1]).join(',')")" >> "$GITHUB_OUTPUT"
+
+      - name: Create a read-only token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SETTINGS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SETTINGS_APP_PRIVATE_KEY }}
+          owner: BSStudio
+          repositories: ${{ steps.repos.outputs.names }}
+          permission-administration: read
+
+      - name: Compare settings with the baseline
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: node scripts/apply-settings.mjs --dry-run
