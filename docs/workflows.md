@@ -38,7 +38,7 @@ Every GitHub Actions workflow and composite action in the studio's repositories 
 
 ## Spacing and quoting
 
-- Exactly one empty line separates top-level keys, jobs and steps; there is none right before `steps`.
+- Exactly one empty line separates top-level keys, jobs and steps; there is none right before `steps`. A job with `services` puts them right before `steps`, with one empty line before and after them.
 - Plain strings go unquoted; patterns such as globs and cron expressions, and strings YAML requires quoted, use double quotes.
 
 ## Composite actions

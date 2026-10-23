@@ -162,7 +162,7 @@ function checkValues(root, report) {
   }
 }
 
-function checkSteps(steps, kinds, report, { allowShell }) {
+function checkSteps(steps, kinds, report, { allowShell, afterServices }) {
   const items = steps ? steps.children.filter((entry) => entry.isItem) : [];
   items.forEach((item, index) => {
     if (index > 0 && blanksBetween(kinds, items[index - 1].endLine, item.line) !== 1) report(item.line, "one empty line between steps");
@@ -174,7 +174,22 @@ function checkSteps(steps, kinds, report, { allowShell }) {
     const shell = child(item, "shell");
     if (shell && !allowShell) report(shell.line, "no per-step shell");
   });
-  if (steps && blankAbove(kinds, steps.line)) report(steps.line, "no empty line before steps");
+  if (!steps) return;
+  if (afterServices) {
+    if (blanksBetween(kinds, afterServices.endLine, steps.line) !== 1) report(steps.line, "one empty line between services and steps");
+  } else if (blankAbove(kinds, steps.line)) report(steps.line, "no empty line before steps");
+}
+
+// Returns the services node when it sits right before steps, so the steps check knows to expect an empty line.
+function checkServices(job, kinds, report) {
+  const services = child(job, "services");
+  if (!services) return null;
+  const jobKeys = keys(job);
+  const index = jobKeys.indexOf(services);
+  if (blanksBetween(kinds, index > 0 ? jobKeys[index - 1].endLine : job.line, services.line) !== 1) report(services.line, "one empty line before services");
+  if (jobKeys[index + 1]?.key === "steps") return services;
+  report(services.line, "services must come right before steps");
+  return null;
 }
 
 function checkTopLevel(root, kinds, report, { workflow }) {
@@ -214,7 +229,7 @@ function checkWorkflowRules(root, kinds, report) {
     if (index > 0 && blanksBetween(kinds, jobs[index - 1].endLine, job.line) !== 1) report(job.line, "one empty line between jobs");
     if (!child(job, "name")) report(job.line, `job "${job.key}" has no name`);
     if (!child(job, "timeout-minutes") && !child(job, "uses")) report(job.line, `job "${job.key}" has no timeout-minutes`);
-    checkSteps(child(job, "steps"), kinds, report, { allowShell: false });
+    checkSteps(child(job, "steps"), kinds, report, { allowShell: false, afterServices: checkServices(job, kinds, report) });
   });
 }
 
