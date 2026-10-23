@@ -140,6 +140,26 @@ test("on must be a map", () => {
     { line: 3, message: "flow lists hold at most one item" },
     { line: 3, message: "on must be a map" },
   ]);
+  const blockList = doc(header.slice(0, 2), "on:", "  - pull_request", header.slice(4), job, step);
+  assert.deepEqual(check(blockList), [{ line: 3, message: "on must be a map" }]);
+  const unindented = doc(header.slice(0, 2), "on:", "- pull_request", header.slice(4), job, step);
+  assert.deepEqual(check(unindented), [{ line: 3, message: "on must be a map" }]);
+});
+
+test("a comment after a key is not its value", () => {
+  assert.deepEqual(check(doc(header.slice(0, 2), "on: # triggers", header.slice(3), job, step)), []);
+  const unchecked = ["    - shell: python", "      run: echo a"];
+  const expected = [
+    { line: 23, message: "no per-step shell" },
+    { line: 23, message: "step has no name" },
+  ];
+  assert.deepEqual(check(doc(header, job.slice(0, 4), "    steps:", unchecked)), expected);
+  assert.deepEqual(check(doc(header, job.slice(0, 4), "    steps: # build", unchecked)), expected);
+});
+
+test("quoted values compare like plain ones", () => {
+  assert.deepEqual(check(doc(header.slice(0, 14), '    shell: "bash"', header.slice(15), job, step)), []);
+  assert.deepEqual(check(doc(header.slice(0, 6), '  contents: "write"', header.slice(7), job, step)), [{ line: 7, message: "top-level permissions must be read or none" }]);
 });
 
 test("job name and timeout", () => {

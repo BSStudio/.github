@@ -1,13 +1,16 @@
 // Checks a workflow or composite action against the workflow convention (docs/workflows.md).
 // The convention keeps files to a small YAML subset (2-space block style, no anchors, no flow
-// maps, flow lists of at most one item), so an indentation-based reader is enough; anything
-// outside that subset is reported rather than parsed.
+// maps, flow lists of at most one item), so an indentation-based reader is enough. Anchors,
+// aliases, flow maps and longer flow lists are reported; other constructs outside the subset,
+// such as plain scalars continued on the next line, are not detected and may be misread.
 
 const KEY = /^(?:"([^"]+)"|([A-Za-z_][\w.-]*)):(?:\s+(.*))?$/;
 const BLOCK_SCALAR = /^[|>][+-]?\d*\s*(#.*)?$/;
 const TOP_LEVEL_ORDER = ["name", "run-name", "on", "permissions", "concurrency", "defaults", "env", "jobs"];
 
-const withoutComment = (value) => value.replace(/\s+#.*$/, "");
+// KEY has already consumed the space after the colon, so a value that is only a comment starts with "#".
+const withoutComment = (value) => value.replace(/(^|\s+)#.*$/, "");
+const unquoted = (value) => value?.replace(/^"(.*)"$|^'(.*)'$/, "$1$2");
 
 function parse(text) {
   const lines = text.split("\n");
@@ -211,19 +214,19 @@ function checkWorkflowRules(root, kinds, report) {
   const permissions = child(root, "permissions");
   if (!permissions) report(1, "missing top-level permissions");
   else {
-    if (permissions.value === "write-all") report(permissions.line, "top-level permissions must be read or none");
-    for (const scope of keys(permissions)) if (scope.value === "write") report(scope.line, "top-level permissions must be read or none");
+    if (unquoted(permissions.value) === "write-all") report(permissions.line, "top-level permissions must be read or none");
+    for (const scope of keys(permissions)) if (unquoted(scope.value) === "write") report(scope.line, "top-level permissions must be read or none");
   }
 
   const on = child(root, "on");
   if (on) {
-    if (on.value) report(on.line, "on must be a map");
+    if (on.value || on.children.some((entry) => entry.isItem)) report(on.line, "on must be a map");
     else if (child(on, "pull_request") && !child(root, "concurrency")) report(on.line, "missing concurrency for pull_request");
   }
 
   const jobs = keys(child(root, "jobs"));
   const hasRun = jobs.some((job) => (child(job, "steps")?.children ?? []).some((step) => child(step, "run")));
-  if (hasRun && child(child(child(root, "defaults"), "run"), "shell")?.value !== "bash") report(1, "missing defaults.run.shell: bash");
+  if (hasRun && unquoted(child(child(child(root, "defaults"), "run"), "shell")?.value) !== "bash") report(1, "missing defaults.run.shell: bash");
 
   jobs.forEach((job, index) => {
     if (index > 0 && blanksBetween(kinds, jobs[index - 1].endLine, job.line) !== 1) report(job.line, "one empty line between jobs");
