@@ -220,6 +220,19 @@ test("no empty line before steps", () => {
   assert.deepEqual(check(text), [{ line: 23, message: "no empty line before steps" }]);
 });
 
+test("services sit between empty lines right before steps", () => {
+  const services = ["    services:", "      postgres:", "        image: postgres:18"];
+  assert.deepEqual(check(doc(header, job.slice(0, 4), "", services, "", "    steps:", step)), []);
+  assert.deepEqual(check(doc(header, job.slice(0, 4), "", "    # Databases for the tests.", services, "", "    # The suite.", "    steps:", step)), []);
+  assert.deepEqual(check(doc(header, job.slice(0, 4), services, "    steps:", step)), [
+    { line: 22, message: "one empty line before services" },
+    { line: 25, message: "one empty line between services and steps" },
+  ]);
+  assert.deepEqual(check(doc(header, job.slice(0, 3), "", services, "    timeout-minutes: 10", "    steps:", step)), [
+    { line: 22, message: "services must come right before steps" },
+  ]);
+});
+
 test("spacing between jobs and top-level keys", () => {
   const text = doc(header.slice(0, 4), header.slice(5), job, step, "  lint:", "    name: Lint", "    runs-on: ubuntu-latest", "    timeout-minutes: 10", "    steps:", step);
   assert.deepEqual(check(text), [
