@@ -13,7 +13,7 @@ Every GitHub Actions workflow and composite action in the studio's repositories 
 
 - A workflow grants no more than reading by default: `permissions` is always set at the top, normally to `contents: read`. Write scopes go on the one job that needs them.
 - No code from a pull request runs with a write scope. A job that runs on pull requests holds one only if every step that uses it is skipped on pull requests, or if the job checks nothing out and its steps are pinned actions that act on the pull request itself. The first case covers today's single build-and-push jobs of the publish workflows, until they move to a shared publish workflow that splits building from pushing; the second covers labeling pull requests.
-- Secrets are passed only on events other than `pull_request` (review).
+- Secrets are passed only on events other than `pull_request`, except upload tokens that can only add reports, such as Codecov's (review).
 - Checkouts set `persist-credentials: false`; a job that pushes keeps the credentials and says why in a comment.
 - Every action is pinned by its full commit SHA with the release in a comment, `@<sha> # vX.Y.Z`. Renovate keeps the pins current.
 
