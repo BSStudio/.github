@@ -39,9 +39,11 @@ jobs:
           # Every dependency's licence may be combined with GPL-3.0 code that is distributed (public Docker images).
           # Missing on purpose, so they fail and need a decision: AGPL-3.0, proprietary and source-available
           # licences, non-commercial ones, and GPL-incompatible copyleft (EPL, CDDL, GPL-2.0-only).
+          # LicenseRef-scancode-protobuf is ScanCode's ID for protobuf's licence: BSD-3-Clause plus a note on generated code.
           allow-licenses: >-
             MIT, MIT-0, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Zlib, BSL-1.0, Unlicense, CC0-1.0,
-            WTFPL, BlueOak-1.0.0, Python-2.0, PSF-2.0, Artistic-2.0, Unicode-3.0, Unicode-DFS-2016,
+            WTFPL, BlueOak-1.0.0, Python-2.0, PSF-2.0, Artistic-2.0, Unicode-3.0, Unicode-DFS-2016, HPND-Markus-Kuhn,
             MPL-2.0, LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only, LGPL-3.0-or-later,
             GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later,
-            CC-BY-3.0, CC-BY-4.0, OFL-1.1
+            CC-BY-3.0, CC-BY-4.0, OFL-1.1,
+            LicenseRef-scancode-protobuf
