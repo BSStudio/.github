@@ -75,8 +75,8 @@ jobs:
 ```
 
 - The job must be named `Checks`: the checks then report as `Checks / Workflows` and `Checks / Dependencies`, the names the repository's ruleset requires.
-- `dependency-review: true` adds the dependency review for repositories with package manifests. It works on public repositories only and checks every new or changed dependency for known vulnerabilities and for a licence outside the allow-list in `shared-checks.yml`. Without the input the `Dependencies` job is skipped, which still satisfies a required check.
-- The pin follows this repository's releases: Renovate proposes each new release in every caller, and that pull request runs the new checks against the repository before anything merges.
+- `dependency-review: true` adds the dependency review for repositories with package manifests. It works on public repositories only and checks every new or changed dependency for known vulnerabilities and for a licence outside the licence policy in `.github/dependency-review.yml`. Without the input the `Dependencies` job is skipped, which still satisfies a required check.
+- The pin follows this repository's releases: Renovate proposes each new release in every caller, and that pull request runs the new checks against the repository before anything merges. The licence policy is the exception: every caller reads it from this repository's `main`, so a change to it applies on the next run, and re-running a failed `Checks / Dependencies` picks it up.
 
 ## Running the checks locally
 
