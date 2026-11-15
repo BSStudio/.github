@@ -8,7 +8,7 @@ Organisation-wide defaults for Budavári Schönherz Stúdió's GitHub repositori
 node --test "scripts/*.test.mjs"
 ```
 
-This repository's own `checks.yml` calls `shared-checks.yml` from the same commit, so the PR runs any change to the checks against this repository first, except the Dependencies job, which this repository doesn't enable.
+This repository's own `checks.yml` calls `shared-checks.yml` from the same commit, so the PR runs any change to the checks against this repository first, except the Dependencies job, which this repository doesn't enable. Instead, the Test workflow's `Licence policy` job runs the dependency review with the PR's own `.github/dependency-review.yml`.
 
 ## Commits and branches
 
