@@ -12,3 +12,8 @@ allow-licenses: >-
   GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later,
   CC-BY-3.0, CC-BY-4.0, OFL-1.1,
   LicenseRef-scancode-protobuf
+
+# Packages whose licence the policy excludes but whose use here it permits, matched by name across all versions.
+allow-dependencies-licenses:
+  # FSL-1.1-Apache-2.0 forbids only competing with Sentry. The Sentry CLI, run by @sentry/bundler-plugins at build time.
+  - pkg:npm/sentry
