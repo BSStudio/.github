@@ -36,7 +36,6 @@ jobs:
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          # The licence policy applies to every caller from main, without a release.
           config-file: BSStudio/.github/.github/dependency-review.yml@main
           # The file is public, but unauthenticated requests share the runner's per-IP rate limit.
           external-repo-token: ${{ github.token }}

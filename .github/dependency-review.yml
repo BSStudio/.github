@@ -1,4 +1,4 @@
-# Read from main by every caller of shared-checks.yml: a change applies to their next run without a release.
+# Read from main by every caller of shared-checks.yml.
 
 # Every dependency's licence may be combined with GPL-3.0 code that is distributed (public Docker images).
 # Missing on purpose, so they fail and need a decision: AGPL-3.0, proprietary and source-available
@@ -15,5 +15,5 @@ allow-licenses: >-
 
 # Packages whose licence the policy excludes but whose use here it permits, matched by name across all versions.
 allow-dependencies-licenses:
-  # FSL-1.1-Apache-2.0 forbids only competing with Sentry. The Sentry CLI, run by @sentry/bundler-plugins at build time.
+  # FSL-1.1-Apache-2.0 forbids only competing with Sentry. Build-time CLI of @sentry/bundler-plugins: no image may ship it.
   - pkg:npm/sentry
