@@ -1,0 +1,118 @@
+name: Shared publish
+
+on:
+  workflow_call:
+    inputs:
+      images:
+        description: JSON list of the images to build, each with a component (empty for the repository's own name), a context and an optional file.
+        type: string
+        default: |
+          [{"component": "", "context": "."}]
+
+      build-args:
+        description: Extra build arguments, one KEY=value per line, after the standard VERSION and REVISION.
+        type: string
+        default: ""
+
+    secrets:
+      sentry-auth-token:
+        description: Exposed to tag builds as the BuildKit secret SENTRY_AUTH_TOKEN.
+        required: false
+
+    outputs:
+      version:
+        description: The version the images were built with.
+        value: ${{ jobs.version.outputs.version }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      revision: ${{ steps.version.outputs.revision }}
+    steps:
+      # Sentry parses the version as semver, which has no leading v.
+      - name: Resolve the version
+        id: version
+        env:
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          revision=${SHA:0:7}
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version=${GITHUB_REF_NAME#v}; else version=0.0.0+$revision; fi
+          printf 'version=%s\nrevision=%s\n' "$version" "$revision" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.component && format('Build ({0})', matrix.component) || 'Build' }}
+    needs: version
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.images) }}
+    steps:
+      - name: Build the image
+        uses: $/.github/actions/docker-build
+        with:
+          component: ${{ matrix.component }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: "false"
+          version: ${{ needs.version.outputs.version }}
+          revision: ${{ needs.version.outputs.revision }}
+          build-args: ${{ inputs.build-args }}
+
+  publish:
+    name: ${{ matrix.component && format('Publish ({0})', matrix.component) || 'Publish' }}
+    needs: version
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      # Mint the OIDC token and write the build provenance attestation.
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.images) }}
+    steps:
+      - name: Log in to ghcr.io
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the image
+        id: build
+        uses: $/.github/actions/docker-build
+        with:
+          component: ${{ matrix.component }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: "true"
+          version: ${{ needs.version.outputs.version }}
+          revision: ${{ needs.version.outputs.revision }}
+          build-args: ${{ inputs.build-args }}
+          sentry-auth-token: ${{ github.ref_type == 'tag' && secrets.sentry-auth-token || '' }}
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.build.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          # Pushing to ghcr would add an untagged referrer artifact.
+          push-to-registry: false

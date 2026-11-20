@@ -1,0 +1,100 @@
+name: Docker build
+
+description: Checks out the repository and builds one image for ghcr.io with the studio's tags, labels and build arguments, pushing it when asked.
+
+inputs:
+  repository:
+    description: The <owner>/<repo> the image is named after; a repository whose name starts with a dot, like .github, needs another.
+    default: ${{ github.repository }}
+
+  component:
+    description: Name appended to the image, as in ghcr.io/<owner>/<repo>/<component>; empty for ghcr.io/<owner>/<repo>.
+    default: ""
+
+  context:
+    description: Build context.
+    default: .
+
+  file:
+    description: Dockerfile path; empty for the context's Dockerfile.
+    default: ""
+
+  push:
+    description: Push the image, "true" or "false".
+    required: true
+
+  version:
+    description: Passed to the build as VERSION.
+    required: true
+
+  revision:
+    description: Passed to the build as REVISION.
+    required: true
+
+  build-args:
+    description: Extra build arguments, one KEY=value per line.
+    default: ""
+
+  sentry-auth-token:
+    description: Exposed to the build as the BuildKit secret SENTRY_AUTH_TOKEN when not empty.
+    default: ""
+
+outputs:
+  image:
+    description: The image name, lowercased.
+    value: ${{ steps.image.outputs.name }}
+
+  digest:
+    description: The image digest.
+    value: ${{ steps.build.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check out
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    # metadata-action lowercases the name itself, actions/attest does not.
+    - name: Name the image
+      id: image
+      shell: bash
+      env:
+        REPOSITORY: ${{ inputs.repository }}
+        COMPONENT: ${{ inputs.component }}
+      run: echo "name=ghcr.io/${REPOSITORY,,}${COMPONENT:+/${COMPONENT,,}}" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+    - name: Extract Docker metadata
+      id: meta
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+      with:
+        images: ${{ steps.image.outputs.name }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+
+    - name: Build the image
+      id: build
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.file }}
+        push: ${{ inputs.push }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ inputs.version }}
+          REVISION=${{ inputs.revision }}
+          ${{ inputs.build-args }}
+        secrets: ${{ inputs.sentry-auth-token && format('SENTRY_AUTH_TOKEN={0}', inputs.sentry-auth-token) || '' }}
+        cache-from: type=gha,scope=${{ steps.image.outputs.name }}
+        cache-to: type=gha,mode=max,scope=${{ steps.image.outputs.name }}
+        # BuildKit's own attestations would push untagged "unknown/unknown" manifests to ghcr; the caller attests instead.
+        provenance: false
+        sbom: false

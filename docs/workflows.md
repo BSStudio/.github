@@ -13,7 +13,7 @@ Every GitHub Actions workflow and composite action in the studio's repositories 
 
 - A workflow grants no more than reading by default: `permissions` is always set at the top, normally to `contents: read`.
 - Write scopes go on the one job that needs them (review).
-- No code from a pull request runs with a write scope (review). A job that runs on pull requests holds one only if every step that uses it is skipped on pull requests, or if the job checks nothing out and its steps are pinned actions that act on the pull request itself. The first case covers today's single build-and-push jobs of the publish workflows, until they move to a shared publish workflow that splits building from pushing; the second covers labeling pull requests.
+- No code from a pull request runs with a write scope (review). A job that runs on pull requests holds one only if it checks nothing out and its steps are pinned actions that act on the pull request itself, such as labeling it. A job that calls a reusable workflow sets the most the called jobs may hold, and the rule applies to those jobs.
 - Secrets are passed only on events other than `pull_request`, except upload tokens that can only add reports, such as Codecov's (review).
 - Checkouts set `persist-credentials: false`; a job that pushes keeps the credentials and says why in a comment (the comment: review).
 - Every action is pinned by its full commit SHA with the release in a comment, `@<sha> # vX.Y.Z` (the comment: review). Renovate keeps the pins current.
@@ -47,6 +47,8 @@ Every GitHub Actions workflow and composite action in the studio's repositories 
 
 The same rules apply to `action.yml` files, except that GitHub requires `shell` on every `run` step there. actionlint does not read `action.yml` files, so scripts in composite actions get no shellcheck: they stay at one command or move into a script file (review).
 
+A reusable workflow reaches its own actions with `$/`, not `./`: in a called workflow a `./` action resolves against the caller's checkout.
+
 ## Calling the shared checks
 
 Every repository runs the checks through the reusable workflow in this repository, from a `.github/workflows/checks.yml` like this:
@@ -77,6 +79,59 @@ jobs:
 - The job must be named `Checks`: the checks then report as `Checks / Workflows` and `Checks / Dependencies`, the names the repository's ruleset requires.
 - `dependency-review: true` adds the dependency review for repositories with package manifests. It works on public repositories only and checks every new or changed dependency for known vulnerabilities and for a licence outside the licence policy in `.github/dependency-review.yml`. Without the input the `Dependencies` job is skipped, which still satisfies a required check.
 - The pin follows this repository's releases: Renovate proposes each new release in every caller, and that pull request runs the new checks against the repository before anything merges. The licence policy is the exception: every caller reads it from this repository's `main`, so a change to it applies on the next run, and re-running a failed `Checks / Dependencies` picks it up.
+
+## Calling the shared publish workflow
+
+Every repository that publishes Docker images to ghcr.io builds them through `.github/workflows/shared-publish.yml` in this repository, from a `.github/workflows/docker-publish.yml` like this:
+
+```yaml
+name: Docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docker:
+    name: Docker
+    uses: BSStudio/.github/.github/workflows/shared-publish.yml@<release commit SHA> # vX.Y.Z
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    secrets:
+      sentry-auth-token: ${{ github.ref_type == 'tag' && secrets.SENTRY_AUTH_TOKEN || '' }}
+```
+
+- On pull requests a `Build` job builds every image with `contents: read` and no secrets, and pushes nothing. On every other event a `Publish` job builds, pushes and attests; it needs the write scopes the caller grants.
+- The image is `ghcr.io/<owner>/<repository>`, lowercased. A repository with several images lists them in `images`, each named `ghcr.io/<owner>/<repository>/<component>`; an entry takes `file` for a Dockerfile other than the context's own. The list is a block scalar, since the convention has no flow maps:
+
+  ```yaml
+      with:
+        images: |
+          [
+            {"component": "backend", "context": "backend"},
+            {"component": "frontend", "context": "frontend"}
+          ]
+  ```
+
+- Tags are the branch name, `pr-<number>` (never pushed), and `X.Y.Z` and `X.Y` for a `vX.Y.Z` tag.
+- Every build gets the build arguments `VERSION` and `REVISION`, and the Dockerfile declares the ones it uses. `REVISION` is the commit's first seven characters (the pull request's head commit on pull requests); `VERSION` is the tag without its `v` on a tag, otherwise `0.0.0+<REVISION>`. A local build gets neither, so the `ARG` default applies. `build-args` adds more, one `KEY=value` per line. The `version` output passes the version to the caller's later jobs.
+- Only tag builds get the Sentry token, as the BuildKit secret `SENTRY_AUTH_TOKEN`. Other builds run without it, so the Dockerfile's secret mount must not be `required`. The caller passes the token on tags only as well, which keeps it off pull request runs.
+- Each pushed image gets a build provenance attestation, kept in GitHub's attestation store and signed by this repository's workflow. Verify it with `gh attestation verify oci://<image> --owner <owner>`, adding `--signer-repo BSStudio/.github` when the owner is not BSStudio.
+- The pin follows this repository's releases, as for the shared checks.
 
 ## Running the checks locally
 
