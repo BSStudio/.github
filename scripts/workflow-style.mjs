@@ -234,6 +234,12 @@ function checkWorkflowRules(root, kinds, report) {
     if (!child(job, "timeout-minutes") && !child(job, "uses")) report(job.line, `job "${job.key}" has no timeout-minutes`);
     checkSteps(child(job, "steps"), kinds, report, { allowShell: false, afterServices: checkServices(job, kinds, report) });
   });
+
+  // In a called workflow ./ resolves against the caller's repository.
+  if (child(on, "workflow_call")) {
+    const uses = jobs.flatMap((job) => [child(job, "uses"), ...(child(job, "steps")?.children ?? []).map((step) => child(step, "uses"))]);
+    for (const node of uses) if (unquoted(node?.value)?.startsWith("./")) report(node.line, "a reusable workflow reaches its own actions with $/, not ./");
+  }
 }
 
 export function checkWorkflow(text, path) {

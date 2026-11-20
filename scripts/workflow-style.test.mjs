@@ -342,6 +342,23 @@ test("comments do not affect spacing or order", () => {
   assert.deepEqual(check(text), []);
 });
 
+// Lines 1–9; the first job starts on line 10.
+const reusable = (...jobLines) =>
+  doc("name: Shared", "", "on:", "  workflow_call:", "", "permissions:", "  contents: read", "", "jobs:", ...jobLines);
+const localAction = "a reusable workflow reaches its own actions with $/, not ./";
+
+test("reusable workflow reaches its own actions with $/", () => {
+  const stepUses = reusable(job, "      - name: Build", "        uses: ./.github/actions/x");
+  assert.deepEqual(check(stepUses), [{ line: 16, message: localAction }]);
+  const jobUses = reusable("  call:", "    name: Call", "    uses: ./.github/workflows/y.yml");
+  assert.deepEqual(check(jobUses), [{ line: 12, message: localAction }]);
+});
+
+test("./ paths stay allowed outside reusable workflows, and $/ inside them", () => {
+  assert.deepEqual(check(doc(header, job, "      - name: Build", "        uses: ./.github/actions/x")), []);
+  assert.deepEqual(check(reusable(job, "      - name: Build", '        uses: "$/.github/actions/x"')), []);
+});
+
 test("reusable-workflow jobs and composite actions are exempt where GitHub requires it", () => {
   const caller = doc(header, "  checks:", "    name: Checks", "    uses: BSStudio/.github/.github/workflows/shared-checks.yml@3d3c42e5aac5ba805825da76410c181273ba90b1 # v1.0.0", "    with:", "      dependency-review: true");
   assert.deepEqual(check(caller), []);
