@@ -235,9 +235,9 @@ function checkWorkflowRules(root, kinds, report) {
     checkSteps(child(job, "steps"), kinds, report, { allowShell: false, afterServices: checkServices(job, kinds, report) });
   });
 
-  // In a called workflow ./ resolves against the caller's repository.
+  // In a called workflow a ./ action resolves against the caller's checkout; a ./ workflow resolves against the called workflow's commit.
   if (child(on, "workflow_call")) {
-    const uses = jobs.flatMap((job) => [child(job, "uses"), ...(child(job, "steps")?.children ?? []).map((step) => child(step, "uses"))]);
+    const uses = jobs.flatMap((job) => (child(job, "steps")?.children ?? []).map((step) => child(step, "uses")));
     for (const node of uses) if (unquoted(node?.value)?.startsWith("./")) report(node.line, "a reusable workflow reaches its own actions with $/, not ./");
   }
 }

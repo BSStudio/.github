@@ -114,5 +114,5 @@ jobs:
         with:
           subject-name: ${{ steps.build.outputs.image }}
           subject-digest: ${{ steps.build.outputs.digest }}
-          # Pushing to ghcr would add an untagged referrer artifact; GitHub's attestation store is enough.
+          # Pushing to ghcr would add an untagged referrer artifact.
           push-to-registry: false

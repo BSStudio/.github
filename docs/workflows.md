@@ -47,7 +47,7 @@ Every GitHub Actions workflow and composite action in the studio's repositories 
 
 The same rules apply to `action.yml` files, except that GitHub requires `shell` on every `run` step there. actionlint does not read `action.yml` files, so scripts in composite actions get no shellcheck: they stay at one command or move into a script file (review).
 
-A reusable workflow reaches its own actions with `$/`, not `./`: in a called workflow `./` resolves against the caller's repository.
+A reusable workflow reaches its own actions with `$/`, not `./`: in a called workflow a `./` action resolves against the caller's checkout.
 
 ## Calling the shared checks
 
