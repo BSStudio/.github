@@ -49,6 +49,7 @@ jobs:
         id: build
         uses: ./.github/actions/docker-build
         with:
+          repository: BSStudio/Docker-Build-Test
           context: test/docker-build
           push: "false"
           version: 0.0.0+test
@@ -57,7 +58,7 @@ jobs:
       - name: Check the image name
         env:
           IMAGE: ${{ steps.build.outputs.image }}
-        run: test "$IMAGE" = ghcr.io/bsstudio/.github
+        run: test "$IMAGE" = ghcr.io/bsstudio/docker-build-test
 
   licence-policy:
     name: Licence policy

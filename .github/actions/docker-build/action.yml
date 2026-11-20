@@ -3,6 +3,10 @@ name: Docker build
 description: Checks out the repository and builds one image for ghcr.io with the studio's tags, labels and build arguments, pushing it when asked.
 
 inputs:
+  repository:
+    description: The <owner>/<repo> the image is named after; a repository whose name starts with a dot, like .github, needs another.
+    default: ${{ github.repository }}
+
   component:
     description: Name appended to the image, as in ghcr.io/<owner>/<repo>/<component>; empty for ghcr.io/<owner>/<repo>.
     default: ""
@@ -57,8 +61,9 @@ runs:
       id: image
       shell: bash
       env:
+        REPOSITORY: ${{ inputs.repository }}
         COMPONENT: ${{ inputs.component }}
-      run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}${COMPONENT:+/${COMPONENT,,}}" >> "$GITHUB_OUTPUT"
+      run: echo "name=ghcr.io/${REPOSITORY,,}${COMPONENT:+/${COMPONENT,,}}" >> "$GITHUB_OUTPUT"
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
