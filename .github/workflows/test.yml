@@ -35,6 +35,30 @@ jobs:
       - name: Run tests
         run: node --test "scripts/*.test.mjs"
 
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the test image
+        id: build
+        uses: ./.github/actions/docker-build
+        with:
+          context: test/docker-build
+          push: "false"
+          version: 0.0.0+test
+          revision: test
+
+      - name: Check the image name
+        env:
+          IMAGE: ${{ steps.build.outputs.image }}
+        run: test "$IMAGE" = ghcr.io/bsstudio/.github
+
   licence-policy:
     name: Licence policy
     if: github.event_name == 'pull_request'
